@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calcolatore costo trasporto</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 min-h-screen text-black">
+    <!-- Navigation -->
+    <nav class="bg-white/10 backdrop-blur-lg border-b border-white/10 sticky top-0 z-50">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-gradient-to-r from-blue-500 to-purple-600 p-2 rounded-xl">
+                        <i class="fas fa-shipping-fast text-white text-xl"></i>
+                    </div>
+                    <span class="text-xl font-bold text-white">Calcolatore costo trasporto</span>
+                </div>
+                <div class="hidden md:flex items-center space-x-6">
+                    <a href="#calculator" class="text-white/80 hover:text-white transition font-medium">Calcolatore</a>
+                    <a href="#saved" id="savedCalculationsLink" class="hidden text-white/80 hover:text-white transition font-medium">Calcoli Salvati</a>
+                    <a href="#login" class="text-white/80 hover:text-white transition font-medium">Login</a>
+                    <button id="adminLinkBtn" class="hidden text-white/80 hover:text-white transition font-medium">
+                        <i class="fas fa-user-shield mr-2"></i> Admin
+                    </button>
+                    <button id="userMenuBtn" class="hidden text-white/80 hover:text-white transition font-medium">
+                        <i class="fas fa-user mr-2"></i> <span id="userName"></span>
+                    </button>
+                    <button id="logoutBtn" class="hidden bg-gradient-to-r from-red-500 to-pink-600 px-4 py-2 rounded-lg hover:from-red-600 hover:to-pink-700 transition font-medium text-white">
+                        <i class="fas fa-sign-out-alt mr-2"></i> Esci
+                    </button>
+                </div>
+                <!-- Mobile menu button -->
+                <button id="mobileMenuBtn" class="md:hidden text-white">
+                    <i class="fas fa-bars text-2xl"></i>
+                </button>
+            </div>
+            <!-- Mobile menu -->
+            <div id="mobileMenu" class="hidden md:hidden pb-4">
+                <div class="flex flex-col space-y-3">
+                    <a href="#calculator" class="text-white/80 hover:text-white transition font-medium">Calcolatore</a>
+                    <a href="#saved" id="savedCalculationsLinkMobile" class="hidden text-white/80 hover:text-white transition font-medium">Calcoli Salvati</a>
+                    <a href="#login" class="text-white/80 hover:text-white transition font-medium">Login</a>
+                    <button id="adminLinkBtnMobile" class="hidden text-white/80 hover:text-white transition font-medium text-left">
+                        <i class="fas fa-user-shield mr-2"></i> Admin
+                    </button>
+                    <button id="userMenuBtnMobile" class="hidden text-white/80 hover:text-white transition font-medium text-left">
+                        <i class="fas fa-user mr-2"></i> <span id="userNameMobile"></span>
+                    </button>
+                    <button id="logoutBtnMobile" class="hidden bg-gradient-to-r from-red-500 to-pink-600 px-4 py-2 rounded-lg hover:from-red-600 hover:to-pink-700 transition font-medium text-white">
+                        <i class="fas fa-sign-out-alt mr-2"></i> Esci
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Calculator Section -->
+        <section id="calculatorSection" class="mb-12">
+            <div class="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/20 p-6 sm:p-8">
+                <div class="text-center mb-8">
+                    <div class="inline-block bg-gradient-to-r from-blue-500 to-purple-600 p-4 rounded-2xl mb-4">
+                        <i class="fas fa-calculator text-white text-3xl"></i>
+                    </div>
+                    <h2 class="text-3xl sm:text-4xl font-bold text-white mb-2">Calcolatore Costi di Trasporto</h2>
+                    <p class="text-white/60">Calcola i costi di spedizione in tempo reale</p>
+                </div>
+                
+                <div class="grid lg:grid-cols-2 gap-6 lg:gap-8">
+                    <!-- Input Form -->
+                    <div>
+                        <div class="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+                            <h3 class="text-lg font-semibold text-white mb-6 flex items-center">
+                                <i class="fas fa-cube mr-2 text-blue-400"></i> Dati Spedizione
+                            </h3>
+                            
+                            <div class="space-y-5">
+                                <!-- Provincia -->
+                                <div>
+                                    <label class="block text-sm font-medium text-white/80 mb-2">
+                                        <i class="fas fa-map-marker-alt mr-2 text-blue-400"></i> Provincia
+                                    </label>
+                                    <select id="provincia" class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white/20 transition">
+                                        <option value="" class="text-gray-900">Seleziona provincia</option>
+                                        <!-- Province will be populated dynamically from admin panel -->
+                                    </select>
+                                </div>
+                                
+                                <!-- Peso -->
+                                <div>
+                                    <label class="block text-sm font-medium text-white/80 mb-2">
+                                        <i class="fas fa-weight-hanging mr-2 text-blue-400"></i> Peso (kg)
+                                    </label>
+                                    <input type="number" id="peso" class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white/20 transition" placeholder="Inserisci peso" step="0.1" min="0">
+                                </div>
+                                
+                                <!-- Sponda -->
+                                <div>
+                                    <label class="block text-sm font-medium text-white/80 mb-2">
+                                        <i class="fas fa-truck-loading mr-2 text-blue-400"></i> Sponda Idraulica
+                                    </label>
+                                    <select id="sponda" class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white/20 transition">
+                                        <option value="no" class="text-gray-900">No</option>
+                                        <option value="si" class="text-gray-900">Sì</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Batteria -->
+                                <div>
+                                    <label class="block text-sm font-medium text-white/80 mb-2">
+                                        <i class="fas fa-battery-full mr-2 text-blue-400"></i> Batteria
+                                    </label>
+                                    <select id="batteria" class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white/20 transition">
+                                        <option value="no" class="text-gray-900">No</option>
+                                        <option value="si" class="text-gray-900">Sì</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Fascio -->
+                                <div>
+                                    <label class="block text-sm font-medium text-white/80 mb-2">
+                                        <i class="fas fa-box mr-2 text-blue-400"></i> Fascio
+                                    </label>
+                                    <select id="fascio" class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white/20 transition">
+                                        <option value="no" class="text-gray-900">No</option>
+                                        <option value="3-4" class="text-gray-900">Tra 3 e 4 metri</option>
+                                        <option value="4-5" class="text-gray-900">Tra 4 e 5 metri</option>
+                                        <option value="oltre5" class="text-gray-900">Oltre 5 metri</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Pallet Moduli Sfusi -->
+                                <div>
+                                    <label class="block text-sm font-medium text-white/80 mb-2">
+                                        <i class="fas fa-pallet mr-2 text-blue-400"></i> Pallet Moduli Sfusi
+                                    </label>
+                                    <select id="palletSfuso" class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white/20 transition">
+                                        <option value="no" class="text-gray-900">No</option>
+                                        <option value="si" class="text-gray-900">Sì</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Numero Righe d'Ordine -->
+                                <div>
+                                    <label class="block text-sm font-medium text-white/80 mb-2">
+                                        <i class="fas fa-list-ol mr-2 text-blue-400"></i> Numero Righe d'Ordine
+                                    </label>
+                                    <input type="number" id="numeroRighe" class="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white placeholder-white/50 focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white/20 transition" placeholder="Inserisci numero righe" step="1" min="0">
+                                </div>
+                                
+                                <!-- Calculate Button -->
+                                <button onclick="calculateCost()" class="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-4 rounded-xl hover:from-blue-600 hover:to-purple-700 transition font-semibold text-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+                                    <i class="fas fa-calculator mr-2"></i> Calcola Costo
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Results -->
+                    <div>
+                        <div class="bg-gradient-to-br from-purple-500/20 to-blue-500/20 backdrop-blur-sm rounded-xl p-6 border border-white/20">
+                            <h3 class="text-lg font-semibold text-white mb-6 flex items-center">
+                                <i class="fas fa-chart-line mr-2 text-blue-400"></i> Risultati
+                            </h3>
+                            
+                            <div id="calculationResult" class="space-y-4">
+                                <div class="text-center text-white/60 py-8">
+                                    <i class="fas fa-info-circle text-4xl mb-3"></i>
+                                    <p>Inserisci provincia e peso per calcolare i costi</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Action Buttons -->
+                            <div id="actionButtons" class="hidden mt-6 space-y-2">
+                                <button onclick="saveCalculation()" class="w-full bg-green-600 text-white py-3 rounded-xl hover:bg-green-700 transition font-semibold">
+                                    <i class="fas fa-save mr-2"></i> Salva Calcolo
+                                </button>
+                                <button onclick="resetCalculator()" class="w-full bg-white/10 backdrop-blur-sm text-white py-3 rounded-xl hover:bg-white/20 transition font-semibold border border-white/20">
+                                    <i class="fas fa-redo mr-2"></i> Reset
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Saved Calculations Section -->
+        <section id="savedSection" class="hidden">
+            <div class="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/20 p-6 sm:p-8">
+                <div class="text-center mb-8">
+                    <div class="inline-block bg-gradient-to-r from-blue-500 to-purple-600 p-4 rounded-2xl mb-4">
+                        <i class="fas fa-folder-open text-white text-3xl"></i>
+                    </div>
+                    <h2 class="text-3xl sm:text-4xl font-bold text-white mb-2">Calcoli Salvati</h2>
+                    <p class="text-white/60">I tuoi calcoli salvati per un accesso rapido</p>
+                </div>
+                
+                <div id="savedCalculationsList" class="space-y-4">
+                    <!-- Saved calculations will be loaded here -->
+                </div>
+                
+                <div id="noSavedCalculations" class="hidden text-center text-white/60 py-8">
+                    <i class="fas fa-inbox text-4xl mb-3"></i>
+                    <p>Nessun calcolo salvato</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Admin Section -->
+        <section id="adminSection" class="hidden">
+            <div class="bg-white rounded-lg shadow-xl p-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">
+                    <i class="fas fa-user-shield mr-2"></i>Pannello Amministratore
+                </h2>
+                
+                <!-- Admin Navigation Tabs -->
+                <div class="mb-6 border-b border-gray-200">
+                    <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                        <button onclick="showAdminTab('rates')" class="admin-tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-blue-500 text-blue-600" id="ratesTab">
+                            <i class="fas fa-table mr-2"></i>
+                            Tariffe Provinciali
+                        </button>
+                        <button onclick="showAdminTab('rules')" class="admin-tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" id="rulesTab">
+                            <i class="fas fa-cogs mr-2"></i>
+                            Regole Calcolo
+                        </button>
+                        <button onclick="showAdminTab('csv')" class="admin-tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" id="csvTab">
+                            <i class="fas fa-file-csv mr-2"></i>
+                            Carica CSV
+                        </button>
+                        <button onclick="showAdminTab('users')" class="admin-tab-btn whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300" id="usersTab">
+                            <i class="fas fa-users mr-2"></i>
+                            Gestione Utenti
+                        </button>
+                    </nav>
+                </div>
+                
+                <!-- Rates Tab -->
+                <div id="ratesTabContent" class="admin-tab-content">
+                    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4">
+                            <i class="fas fa-table mr-2"></i>Tabella Tariffe Provinciali
+                        </h3>
+                        
+                        <div class="mb-4">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center space-x-4">
+                                    <button onclick="addNewRate()" class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition text-sm">
+                                        <i class="fas fa-plus mr-1"></i> Aggiungi Tariffa
+                                    </button>
+                                    <button onclick="downloadCurrentRates()" class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition text-sm">
+                                        <i class="fas fa-download mr-1"></i> Scarica CSV
+                                    </button>
+                                </div>
+                                <div class="text-sm text-gray-600">
+                                    <i class="fas fa-info-circle mr-1"></i>
+                                    Clicca su una tariffa per modificarla. Le modifiche si applicano immediatamente.
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full bg-white">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Provincia</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sigla</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Regione</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">0-25kg</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">26-50kg</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">51-75kg</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">76-100kg</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">>100kg</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ratesTableBody" class="bg-white divide-y divide-gray-200">
+                                    <!-- Rates will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Rules Tab -->
+                <div id="rulesTabContent" class="admin-tab-content hidden">
+                    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4">
+                            <i class="fas fa-cogs mr-2"></i>Regole Calcolo Costi
+                        </h3>
+                        
+                        <div class="mb-4">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center space-x-4">
+                                    <button onclick="addNewRule()" class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition text-sm">
+                                        <i class="fas fa-plus mr-1"></i> Aggiungi Regola
+                                    </button>
+                                    <button onclick="downloadRules()" class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition text-sm">
+                                        <i class="fas fa-download mr-1"></i> Scarica CSV
+                                    </button>
+                                </div>
+                                <div class="text-sm text-gray-600">
+                                    <i class="fas fa-info-circle mr-1"></i>
+                                    Clicca su una regola per modificarla. Le modifiche si applicano immediatamente al calcolatore.
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full bg-white">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome Regola</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valore</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unità di Misura</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rulesTableBody" class="bg-white divide-y divide-gray-200">
+                                    <!-- Rules will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- CSV Tab -->
+                <div id="csvTabContent" class="admin-tab-content hidden">
+                    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4">
+                            <i class="fas fa-file-csv mr-2"></i>Carica Tariffe da CSV
+                        </h3>
+                        <div class="mb-4">
+                            <p class="text-sm text-gray-600 mb-4">
+                                Carica un file CSV con le tariffe. 
+                                Il file deve avere le colonne: Provincia, Regione, Costo_0_25, Costo_26_50, Costo_51_75, Costo_76_100, Costo_oltre_100
+                            </p>
+                            <div class="flex items-center space-x-4">
+                                <input type="file" id="csvFileInput" accept=".csv" class="hidden">
+                                <button onclick="document.getElementById('csvFileInput').click()" 
+                                        class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
+                                    <i class="fas fa-upload mr-2"></i> Seleziona File CSV
+                                </button>
+                                <button onclick="downloadTemplate()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                                    <i class="fas fa-download mr-2"></i> Scarica Template
+                                </button>
+                            </div>
+                            <div id="csvFileName" class="text-sm text-gray-600 mt-2">Nessun file selezionato</div>
+                        </div>
+                        <div id="csvUploadStatus" class="hidden">
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <div class="flex items-center">
+                                    <i class="fas fa-spinner fa-spin text-blue-600 mr-3"></i>
+                                    <span class="text-blue-800">Elaborazione file CSV in corso...</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="csvUploadResult" class="hidden mt-4">
+                            <!-- Results will be shown here -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Users Tab -->
+                <div id="usersTabContent" class="admin-tab-content hidden">
+                    <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4">
+                            <i class="fas fa-users mr-2"></i>Gestione Utenti
+                        </h3>
+                        
+                        <div class="mb-4">
+                            <div class="flex items-center justify-between mb-4">
+                                <div class="flex items-center space-x-4">
+                                    <button onclick="addNewUser()" class="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 transition text-sm">
+                                        <i class="fas fa-plus mr-1"></i> Aggiungi Utente
+                                    </button>
+                                </div>
+                                <div class="text-sm text-gray-600">
+                                    <i class="fas fa-info-circle mr-1"></i>
+                                    Gli utenti avranno password temporanea "123456" e dovranno cambiarla al primo accesso.
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full bg-white">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ruolo</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Password Cambiata</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="usersTableBody" class="bg-white divide-y divide-gray-200">
+                                    <!-- Users will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Login Section -->
+        <section id="loginSection" class="hidden">
+            <div class="max-w-md mx-auto bg-white rounded-lg shadow-xl p-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center">
+                    <i class="fas fa-sign-in-alt text-blue-600 mr-2"></i>
+                    Accesso Area Riservata
+                </h2>
+                
+                <form id="loginForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                        <input type="email" id="email" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="email@example.com">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                        <input type="password" id="password" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Password">
+                    </div>
+                    
+                    <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition font-semibold">
+                        <i class="fas fa-sign-in-alt mr-2"></i> Accedi
+                    </button>
+                </form>
+                
+                <div class="mt-6 text-center text-sm text-gray-600">
+                    <p>Credenziali demo:</p>
+                    <p>Admin: logistica@esaving.eu / 123456</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal for Rate Editing -->
+    <div id="rateModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-8 max-w-4xl w-full mx-4 max-h-screen overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-gray-800">Modifica Tariffa Provinciale</h3>
+                <button onclick="closeRateModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div id="rateModalContent">
+                <!-- Rate editing form will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .admin-tab-btn {
+            border-bottom: 2px solid transparent;
+            color: #6b7280;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .admin-tab-btn:hover {
+            color: #374151;
+            border-bottom: 2px solid #d1d5db;
+        }
+        
+        .admin-tab-btn.active {
+            color: #2563eb;
+            border-bottom: 2px solid #2563eb;
+        }
+        
+        .admin-tab-content {
+            display: none;
+        }
+        
+        .admin-tab-content.active {
+            display: block;
+        }
+        
+        .editable-rate {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .editable-rate:hover {
+            background-color: #f3f4f6;
+        }
+    </style>
+
+    <script src="script.js"></script>
+</body>
+</html>
