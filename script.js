@@ -25,9 +25,31 @@ async function loadAllData() {
     await loadRules();
     await loadCarriers();
     await loadClients();
-    loadUsers(); // Keep users from localStorage for now
+    await checkIfAdminExists(); // Check if admin exists to show/hide setup button
+    loadUsers(); // Keep users from localStorage for now (will migrate)
     await loadShipments();
     cleanupOldDDTFiles();
+}
+
+// Check if admin user exists in Firestore
+async function checkIfAdminExists() {
+    try {
+        const snapshot = await db.collection('users').limit(1).get();
+        const setupBtn = document.getElementById('setupAdminBtn');
+
+        if (snapshot.empty) {
+            // No users exist, show setup button
+            if (setupBtn) setupBtn.classList.remove('hidden');
+        } else {
+            // Users exist, hide setup button
+            if (setupBtn) setupBtn.classList.add('hidden');
+        }
+    } catch (error) {
+        console.error('Error checking if admin exists:', error);
+        // On error, show setup button to allow manual setup
+        const setupBtn = document.getElementById('setupAdminBtn');
+        if (setupBtn) setupBtn.classList.remove('hidden');
+    }
 }
 
 // Password hashing utility using Web Crypto API
@@ -3033,13 +3055,22 @@ function downloadTemplate() {
 }
 
 // User Management Functions
-function loadUsersTable() {
+async function loadUsersTable() {
     const tbody = document.getElementById('usersTableBody');
     tbody.innerHTML = '';
 
-    Object.keys(users).forEach(email => {
-        const user = users[email];
-        if (user) {
+    try {
+        // Load users from Firestore
+        const snapshot = await db.collection('users').get();
+
+        if (snapshot.empty) {
+            tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">Nessun utente trovato</td></tr>';
+            return;
+        }
+
+        snapshot.forEach(doc => {
+            const user = doc.data();
+            const email = doc.id;
             const row = document.createElement('tr');
             row.className = 'editable-rate';
             row.innerHTML = `
@@ -3060,8 +3091,11 @@ function loadUsersTable() {
                 </td>
             `;
             tbody.appendChild(row);
-        }
-    });
+        });
+    } catch (error) {
+        console.error('Error loading users from Firestore:', error);
+        tbody.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-red-500">Errore nel caricamento utenti</td></tr>';
+    }
 }
 
 function addNewUser() {
@@ -3128,51 +3162,103 @@ async function saveNewUser() {
     const role = document.getElementById('newUserRole').value;
     const userNumber = document.getElementById('newUserNumber').value;
 
-    if (users[email]) {
-        showNotification('Utente con questa email già esistente!', 'error');
-        return;
+    try {
+        // Check if user already exists in Firestore
+        const userDoc = await db.collection('users').doc(email).get();
+        if (userDoc.exists) {
+            showNotification('Utente con questa email già esistente!', 'error');
+            return;
+        }
+
+        // Create user in Firebase Auth with temporary password
+        const tempPassword = '123456';
+        const userCredential = await auth.createUserWithEmailAndPassword(email, tempPassword);
+
+        // Save user data to Firestore
+        await db.collection('users').doc(email).set({
+            name: name,
+            role: role,
+            mustChangePassword: true,
+            userNumber: parseInt(userNumber),
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Sign out after creation (we were signed in as the new user)
+        await auth.signOut();
+
+        // Sign back in as the current admin user
+        if (currentUser) {
+            // We need to re-authenticate with the current user's credentials
+            // For now, we'll just reload the page to force re-login
+            showNotification(`Utente ${email} aggiunto con successo! Effettua nuovamente il login.`, 'success');
+            closeRateModal();
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+        } else {
+            closeRateModal();
+            loadUsersTable();
+            showNotification(`Utente ${email} aggiunto con successo!`, 'success');
+        }
+    } catch (error) {
+        console.error('Error creating user:', error);
+        if (error.code === 'auth/email-already-in-use') {
+            showNotification('Utente con questa email già esistente in Firebase Auth!', 'error');
+        } else {
+            showNotification('Errore nella creazione utente: ' + error.message, 'error');
+        }
     }
-
-    // Hash the temporary password
-    const hashedPassword = await hashPassword('123456');
-
-    users[email] = {
-        email: email,
-        password: hashedPassword,
-        role: role,
-        name: name,
-        mustChangePassword: true,
-        userNumber: parseInt(userNumber)
-    };
-
-    saveUsers();
-    closeRateModal();
-    loadUsersTable();
-    showNotification(`Utente ${email} aggiunto con successo!`, 'success');
 }
 
-function deleteUser(email) {
-    if (users[email].role === 'admin') {
-        showNotification('Non puoi eliminare un amministratore!', 'error');
-        return;
-    }
-    
-    if (confirm(`Sei sicuro di voler eliminare l'utente ${email}?`)) {
-        delete users[email];
-        saveUsers();
-        loadUsersTable();
-        showNotification(`Utente ${email} eliminato con successo!`, 'success');
+async function deleteUser(email) {
+    try {
+        // Get user data first to check role
+        const userDoc = await db.collection('users').doc(email).get();
+        if (!userDoc.exists) {
+            showNotification('Utente non trovato!', 'error');
+            return;
+        }
+
+        const userData = userDoc.data();
+        if (userData.role === 'admin') {
+            showNotification('Non puoi eliminare un amministratore!', 'error');
+            return;
+        }
+
+        if (confirm(`Sei sicuro di voler eliminare l'utente ${email}?`)) {
+            // Delete from Firestore
+            await db.collection('users').doc(email).delete();
+
+            // Delete from Firebase Auth (requires Admin SDK, so we skip this for now)
+            // Users will need to be deleted manually from Firebase Console if needed
+
+            loadUsersTable();
+            showNotification(`Utente ${email} eliminato con successo!`, 'success');
+        }
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        showNotification('Errore nell\'eliminazione utente: ' + error.message, 'error');
     }
 }
 
 async function resetUserPassword(email) {
-    if (confirm(`Sei sicuro di voler resettare la password di ${email}? L'utente dovrà cambiarla al prossimo accesso.`)) {
-        const hashedPassword = await hashPassword('123456');
-        users[email].password = hashedPassword;
-        users[email].mustChangePassword = true;
-        saveUsers();
-        loadUsersTable();
-        showNotification(`Password di ${email} resettata con successo!`, 'success');
+    try {
+        if (confirm(`Sei sicuro di voler resettare la password di ${email}? L'utente dovrà cambiarla al prossimo accesso.`)) {
+            // Update mustChangePassword in Firestore
+            await db.collection('users').doc(email).update({
+                mustChangePassword: true
+            });
+
+            // Note: We cannot reset the actual Firebase Auth password without Admin SDK
+            // The user will need to use Firebase Console's "Reset Password" feature
+            // Or we can implement email-based password reset
+
+            loadUsersTable();
+            showNotification(`Flag cambio password impostato per ${email}. Usa Firebase Console per resettare la password.`, 'success');
+        }
+    } catch (error) {
+        console.error('Error resetting user password:', error);
+        showNotification('Errore nel reset password: ' + error.message, 'error');
     }
 }
 
