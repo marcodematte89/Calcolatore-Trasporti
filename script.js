@@ -1,17 +1,32 @@
+// Firebase Configuration
+const firebaseConfig = {
+    apiKey: "AIzaSyA8Wjt-sgNp2kpQYNWmIihy_3E4xYjIoco",
+    authDomain: "wattyesaving.firebaseapp.com",
+    projectId: "wattyesaving",
+    storageBucket: "wattyesaving.firebasestorage.app",
+    messagingSenderId: "101400604075",
+    appId: "1:101400604075:web:6d1434a8866ff48fb376ee"
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
 // Application State
 let currentUser = null;
 let tariffeProvinciali = {};
 let regoleCalcolo = {};
 let currentCalculation = null;
 
-// Load data from localStorage on page load
-function loadAllData() {
-    loadRates();
-    loadRules();
-    loadCarriers();
-    loadClients();
-    loadUsers();
-    loadShipments();
+// Load data from localStorage/Firestore on page load
+async function loadAllData() {
+    await loadRates();
+    await loadRules();
+    await loadCarriers();
+    await loadClients();
+    loadUsers(); // Keep users from localStorage for now
+    await loadShipments();
     cleanupOldDDTFiles();
 }
 
@@ -1443,29 +1458,26 @@ function showSection(section) {
 
 async function handleLogin(e) {
     e.preventDefault();
-    
+
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
-    
-    if (users[email]) {
-        // Check if password is already hashed (64 characters) or plain text
-        const storedPassword = users[email].password;
-        let passwordMatch = false;
-        
-        if (storedPassword.length === 64) {
-            // Password is hashed, compare with hash
-            const hashedPassword = await hashPassword(password);
-            passwordMatch = storedPassword === hashedPassword;
-        } else {
-            // Password is plain text, compare directly
-            passwordMatch = storedPassword === password;
-        }
-        
-        if (passwordMatch) {
-            currentUser = users[email];
+
+    try {
+        // Sign in with Firebase Auth
+        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+        const firebaseUser = userCredential.user;
+
+        // Get additional user data from Firestore
+        const userDoc = await db.collection('users').doc(firebaseUser.email).get();
+
+        if (userDoc.exists) {
+            currentUser = {
+                email: firebaseUser.email,
+                ...userDoc.data()
+            };
             localStorage.setItem('loggedInUser', JSON.stringify(currentUser));
             updateUIForLoggedInUser();
-            
+
             // Check if user must change password
             if (currentUser.mustChangePassword) {
                 showChangePasswordModal();
@@ -1474,10 +1486,16 @@ async function handleLogin(e) {
                 showNotification('Login effettuato con successo!', 'success');
             }
         } else {
-            showNotification('Credenziali non valide', 'error');
+            showNotification('Utente non trovato nel database', 'error');
+            await auth.signOut();
         }
-    } else {
-        showNotification('Credenziali non valide', 'error');
+    } catch (error) {
+        console.error('Login error:', error);
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+            showNotification('Credenziali non valide', 'error');
+        } else {
+            showNotification('Errore durante il login: ' + error.message, 'error');
+        }
     }
 }
 
@@ -1513,7 +1531,13 @@ function updateUIForLoggedInUser() {
     document.querySelector('nav a[href="#login"]').classList.add('hidden');
 }
 
-function logout() {
+async function logout() {
+    try {
+        await auth.signOut();
+    } catch (error) {
+        console.error('Logout error:', error);
+    }
+
     currentUser = null;
     localStorage.removeItem('loggedInUser');
 
@@ -1531,6 +1555,181 @@ function logout() {
 
     showSection('login');
     showNotification('Logout effettuato', 'info');
+}
+
+// Migration function to move users from localStorage to Firebase
+async function migrateUsersToFirebase() {
+    const localStorageUsers = JSON.parse(localStorage.getItem('users') || '{}');
+    let migratedCount = 0;
+    let errors = [];
+
+    for (const email in localStorageUsers) {
+        const user = localStorageUsers[email];
+        try {
+            // Create user in Firebase Auth
+            // Note: We need the original password, but localStorage has hashed passwords
+            // This is a limitation - users will need to reset passwords
+            console.log(`Skipping ${email} - password migration not possible`);
+            errors.push(`${email}: Cannot migrate hashed password`);
+        } catch (error) {
+            console.error(`Error migrating ${email}:`, error);
+            errors.push(`${email}: ${error.message}`);
+        }
+    }
+
+    console.log(`Migration complete. Migrated: ${migratedCount}, Errors: ${errors.length}`);
+    return { migratedCount, errors };
+}
+
+// Function to create a new user in Firebase (for admin use)
+async function createFirebaseUser(email, password, name, role) {
+    try {
+        // Create user in Firebase Auth
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+
+        // Save additional user data to Firestore
+        await db.collection('users').doc(email).set({
+            name: name,
+            role: role,
+            mustChangePassword: true,
+            userNumber: 0,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        showNotification(`Utente ${email} creato con successo!`, 'success');
+
+        // Sign out after creation
+        await auth.signOut();
+
+        return true;
+    } catch (error) {
+        console.error('Error creating user:', error);
+        showNotification('Errore nella creazione utente: ' + error.message, 'error');
+        return false;
+    }
+}
+
+// Helper function to create initial admin user (run from browser console)
+// Usage: createInitialAdmin('logistica@esaving.eu', '123456', 'Amministratore')
+async function createInitialAdmin(email, password, name) {
+    try {
+        console.log('Creating initial admin user...');
+
+        // Create user in Firebase Auth
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        console.log('Firebase Auth user created');
+
+        // Save additional user data to Firestore
+        await db.collection('users').doc(email).set({
+            name: name,
+            role: 'admin',
+            mustChangePassword: true,
+            userNumber: 0,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        console.log('Firestore user data saved');
+
+        // Sign out after creation
+        await auth.signOut();
+        console.log('Signed out');
+
+        console.log('✅ Admin user created successfully!');
+        console.log(`Email: ${email}`);
+        console.log(`Password: ${password}`);
+        console.log('Please login with these credentials and change the password.');
+
+        return true;
+    } catch (error) {
+        console.error('❌ Error creating admin user:', error);
+        if (error.code === 'auth/email-already-in-use') {
+            console.log('User already exists. You can login with existing credentials.');
+        }
+        return false;
+    }
+}
+
+// Show setup admin modal
+function showSetupAdminModal() {
+    const modal = document.getElementById('rateModal');
+    const content = document.getElementById('rateModalContent');
+
+    content.innerHTML = `
+        <div class="space-y-4">
+            <h3 class="text-xl font-bold text-gray-800">Setup Iniziale Admin</h3>
+            <p class="text-sm text-gray-600">Crea l'utente amministratore iniziale per Firebase.</p>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                <input type="email" id="setupEmail" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="logistica@esaving.eu">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                <input type="password" id="setupPassword" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="123456">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Nome</label>
+                <input type="text" id="setupName" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-teal-500" placeholder="Amministratore">
+            </div>
+
+            <div class="flex gap-4">
+                <button onclick="handleSetupAdmin()" class="flex-1 bg-gradient-to-r from-green-500 to-teal-500 text-white py-3 rounded-lg hover:from-green-600 hover:to-teal-600 transition font-semibold">
+                    <i class="fas fa-check mr-2"></i> Crea Admin
+                </button>
+                <button onclick="closeRateModal()" class="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400 transition font-semibold">
+                    <i class="fas fa-times mr-2"></i> Annulla
+                </button>
+            </div>
+        </div>
+    `;
+
+    modal.classList.remove('hidden');
+}
+
+// Handle setup admin
+async function handleSetupAdmin() {
+    const email = document.getElementById('setupEmail').value;
+    const password = document.getElementById('setupPassword').value;
+    const name = document.getElementById('setupName').value;
+
+    if (!email || !password || !name) {
+        showNotification('Compila tutti i campi', 'error');
+        return;
+    }
+
+    try {
+        showNotification('Creazione utente admin in corso...', 'info');
+
+        // Create user in Firebase Auth
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+
+        // Save additional user data to Firestore
+        await db.collection('users').doc(email).set({
+            name: name,
+            role: 'admin',
+            mustChangePassword: true,
+            userNumber: 0,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Sign out after creation
+        await auth.signOut();
+
+        closeRateModal();
+        showNotification('Utente admin creato con successo! Ora puoi fare login.', 'success');
+
+        // Pre-fill login form
+        document.getElementById('email').value = email;
+        document.getElementById('password').value = password;
+    } catch (error) {
+        console.error('Error creating admin user:', error);
+        if (error.code === 'auth/email-already-in-use') {
+            showNotification('Utente già esistente. Fai login con le credenziali esistenti.', 'error');
+        } else {
+            showNotification('Errore nella creazione: ' + error.message, 'error');
+        }
+    }
 }
 
 function populateProvinces() {
@@ -1905,62 +2104,219 @@ function showAdminTab(tabName) {
     }
 }
 
-function loadRates() {
-    // Load rates from localStorage or use defaults
-    const savedRates = localStorage.getItem('tariffeProvinciali');
-    if (savedRates) {
-        tariffeProvinciali = JSON.parse(savedRates);
-        // Add sigla field if missing
-        Object.keys(tariffeProvinciali).forEach(provincia => {
-            if (!tariffeProvinciali[provincia].sigla) {
-                tariffeProvinciali[provincia].sigla = '';
+async function loadRates() {
+    try {
+        // Try loading from Firestore first
+        const snapshot = await db.collection('rates').get();
+
+        if (!snapshot.empty) {
+            tariffeProvinciali = {};
+            snapshot.forEach(doc => {
+                tariffeProvinciali[doc.id] = doc.data();
+            });
+            console.log('Rates loaded from Firestore');
+        } else {
+            // Fallback to localStorage if Firestore is empty
+            const savedRates = localStorage.getItem('tariffeProvinciali');
+            if (savedRates) {
+                tariffeProvinciali = JSON.parse(savedRates);
+                // Add sigla field if missing
+                Object.keys(tariffeProvinciali).forEach(provincia => {
+                    if (!tariffeProvinciali[provincia].sigla) {
+                        tariffeProvinciali[provincia].sigla = '';
+                    }
+                });
+                console.log('Rates loaded from localStorage (fallback)');
+            } else {
+                tariffeProvinciali = {...defaultTariffeProvinciali};
+                await saveRates();
             }
-        });
-    } else {
-        tariffeProvinciali = {...defaultTariffeProvinciali};
-        saveRates();
+        }
+    } catch (error) {
+        console.error('Error loading rates from Firestore:', error);
+        // Fallback to localStorage on error
+        const savedRates = localStorage.getItem('tariffeProvinciali');
+        if (savedRates) {
+            tariffeProvinciali = JSON.parse(savedRates);
+            Object.keys(tariffeProvinciali).forEach(provincia => {
+                if (!tariffeProvinciali[provincia].sigla) {
+                    tariffeProvinciali[provincia].sigla = '';
+                }
+            });
+            console.log('Rates loaded from localStorage (error fallback)');
+        } else {
+            tariffeProvinciali = {...defaultTariffeProvinciali};
+            saveRates();
+        }
     }
 }
 
-function saveRates() {
-    localStorage.setItem('tariffeProvinciali', JSON.stringify(tariffeProvinciali));
-}
+async function saveRates() {
+    try {
+        // Save to Firestore
+        for (const provincia in tariffeProvinciali) {
+            await db.collection('rates').doc(provincia).set(tariffeProvinciali[provincia]);
+        }
+        console.log('Rates saved to Firestore');
 
-function loadRules() {
-    // Load rules from localStorage or use defaults
-    const savedRules = localStorage.getItem('regoleCalcolo');
-    if (savedRules) {
-        regoleCalcolo = JSON.parse(savedRules);
-    } else {
-        regoleCalcolo = {...defaultRegoleCalcolo};
-        saveRules();
+        // Also save to localStorage as backup
+        localStorage.setItem('tariffeProvinciali', JSON.stringify(tariffeProvinciali));
+    } catch (error) {
+        console.error('Error saving rates to Firestore:', error);
+        // Fallback to localStorage on error
+        localStorage.setItem('tariffeProvinciali', JSON.stringify(tariffeProvinciali));
+        console.log('Rates saved to localStorage (error fallback)');
     }
 }
 
-function saveRules() {
-    localStorage.setItem('regoleCalcolo', JSON.stringify(regoleCalcolo));
-}
+async function loadRules() {
+    try {
+        // Try loading from Firestore first
+        const snapshot = await db.collection('rules').get();
 
-function loadCarriers() {
-    const savedCarriers = localStorage.getItem('vettori');
-    if (savedCarriers) {
-        vettori = JSON.parse(savedCarriers);
+        if (!snapshot.empty) {
+            regoleCalcolo = {};
+            snapshot.forEach(doc => {
+                regoleCalcolo[doc.id] = doc.data();
+            });
+            console.log('Rules loaded from Firestore');
+        } else {
+            // Fallback to localStorage if Firestore is empty
+            const savedRules = localStorage.getItem('regoleCalcolo');
+            if (savedRules) {
+                regoleCalcolo = JSON.parse(savedRules);
+                console.log('Rules loaded from localStorage (fallback)');
+            } else {
+                regoleCalcolo = {...defaultRegoleCalcolo};
+                await saveRules();
+            }
+        }
+    } catch (error) {
+        console.error('Error loading rules from Firestore:', error);
+        // Fallback to localStorage on error
+        const savedRules = localStorage.getItem('regoleCalcolo');
+        if (savedRules) {
+            regoleCalcolo = JSON.parse(savedRules);
+            console.log('Rules loaded from localStorage (error fallback)');
+        } else {
+            regoleCalcolo = {...defaultRegoleCalcolo};
+            saveRules();
+        }
     }
 }
 
-function saveCarriers() {
-    localStorage.setItem('vettori', JSON.stringify(vettori));
-}
+async function saveRules() {
+    try {
+        // Save to Firestore
+        for (const nome in regoleCalcolo) {
+            await db.collection('rules').doc(nome).set(regoleCalcolo[nome]);
+        }
+        console.log('Rules saved to Firestore');
 
-function loadClients() {
-    const savedClients = localStorage.getItem('clienti');
-    if (savedClients) {
-        clienti = JSON.parse(savedClients);
+        // Also save to localStorage as backup
+        localStorage.setItem('regoleCalcolo', JSON.stringify(regoleCalcolo));
+    } catch (error) {
+        console.error('Error saving rules to Firestore:', error);
+        // Fallback to localStorage on error
+        localStorage.setItem('regoleCalcolo', JSON.stringify(regoleCalcolo));
+        console.log('Rules saved to localStorage (error fallback)');
     }
 }
 
-function saveClients() {
-    localStorage.setItem('clienti', JSON.stringify(clienti));
+async function loadCarriers() {
+    try {
+        // Try loading from Firestore first
+        const snapshot = await db.collection('carriers').get();
+
+        if (!snapshot.empty) {
+            vettori = {};
+            snapshot.forEach(doc => {
+                vettori[doc.id] = doc.data();
+            });
+            console.log('Carriers loaded from Firestore');
+        } else {
+            // Fallback to localStorage if Firestore is empty
+            const savedCarriers = localStorage.getItem('vettori');
+            if (savedCarriers) {
+                vettori = JSON.parse(savedCarriers);
+                console.log('Carriers loaded from localStorage (fallback)');
+            }
+        }
+    } catch (error) {
+        console.error('Error loading carriers from Firestore:', error);
+        // Fallback to localStorage on error
+        const savedCarriers = localStorage.getItem('vettori');
+        if (savedCarriers) {
+            vettori = JSON.parse(savedCarriers);
+            console.log('Carriers loaded from localStorage (error fallback)');
+        }
+    }
+}
+
+async function saveCarriers() {
+    try {
+        // Save to Firestore
+        for (const nome in vettori) {
+            await db.collection('carriers').doc(nome).set(vettori[nome]);
+        }
+        console.log('Carriers saved to Firestore');
+
+        // Also save to localStorage as backup
+        localStorage.setItem('vettori', JSON.stringify(vettori));
+    } catch (error) {
+        console.error('Error saving carriers to Firestore:', error);
+        // Fallback to localStorage on error
+        localStorage.setItem('vettori', JSON.stringify(vettori));
+        console.log('Carriers saved to localStorage (error fallback)');
+    }
+}
+
+async function loadClients() {
+    try {
+        // Try loading from Firestore first
+        const snapshot = await db.collection('clients').get();
+
+        if (!snapshot.empty) {
+            clienti = {};
+            snapshot.forEach(doc => {
+                clienti[doc.id] = doc.data();
+            });
+            console.log('Clients loaded from Firestore');
+        } else {
+            // Fallback to localStorage if Firestore is empty
+            const savedClients = localStorage.getItem('clienti');
+            if (savedClients) {
+                clienti = JSON.parse(savedClients);
+                console.log('Clients loaded from localStorage (fallback)');
+            }
+        }
+    } catch (error) {
+        console.error('Error loading clients from Firestore:', error);
+        // Fallback to localStorage on error
+        const savedClients = localStorage.getItem('clienti');
+        if (savedClients) {
+            clienti = JSON.parse(savedClients);
+            console.log('Clients loaded from localStorage (error fallback)');
+        }
+    }
+}
+
+async function saveClients() {
+    try {
+        // Save to Firestore
+        for (const codice in clienti) {
+            await db.collection('clients').doc(codice).set(clienti[codice]);
+        }
+        console.log('Clients saved to Firestore');
+
+        // Also save to localStorage as backup
+        localStorage.setItem('clienti', JSON.stringify(clienti));
+    } catch (error) {
+        console.error('Error saving clients to Firestore:', error);
+        // Fallback to localStorage on error
+        localStorage.setItem('clienti', JSON.stringify(clienti));
+        console.log('Clients saved to localStorage (error fallback)');
+    }
 }
 
 function loadUsers() {
@@ -1974,15 +2330,52 @@ function saveUsers() {
     localStorage.setItem('users', JSON.stringify(users));
 }
 
-function loadShipments() {
-    const savedShipments = localStorage.getItem('spedizioni');
-    if (savedShipments) {
-        spedizioni = JSON.parse(savedShipments);
+async function loadShipments() {
+    try {
+        // Try loading from Firestore first
+        const snapshot = await db.collection('shipments').get();
+
+        if (!snapshot.empty) {
+            spedizioni = {};
+            snapshot.forEach(doc => {
+                spedizioni[doc.id] = doc.data();
+            });
+            console.log('Shipments loaded from Firestore');
+        } else {
+            // Fallback to localStorage if Firestore is empty
+            const savedShipments = localStorage.getItem('spedizioni');
+            if (savedShipments) {
+                spedizioni = JSON.parse(savedShipments);
+                console.log('Shipments loaded from localStorage (fallback)');
+            }
+        }
+    } catch (error) {
+        console.error('Error loading shipments from Firestore:', error);
+        // Fallback to localStorage on error
+        const savedShipments = localStorage.getItem('spedizioni');
+        if (savedShipments) {
+            spedizioni = JSON.parse(savedShipments);
+            console.log('Shipments loaded from localStorage (error fallback)');
+        }
     }
 }
 
-function saveShipments() {
-    localStorage.setItem('spedizioni', JSON.stringify(spedizioni));
+async function saveShipments() {
+    try {
+        // Save to Firestore
+        for (const id in spedizioni) {
+            await db.collection('shipments').doc(id).set(spedizioni[id]);
+        }
+        console.log('Shipments saved to Firestore');
+
+        // Also save to localStorage as backup
+        localStorage.setItem('spedizioni', JSON.stringify(spedizioni));
+    } catch (error) {
+        console.error('Error saving shipments to Firestore:', error);
+        // Fallback to localStorage on error
+        localStorage.setItem('spedizioni', JSON.stringify(spedizioni));
+        console.log('Shipments saved to localStorage (error fallback)');
+    }
 }
 
 function loadRatesTable() {
@@ -2379,7 +2772,7 @@ function saveNewRule() {
 function downloadRules() {
     // Create CSV content
     let csvContent = 'Nome Regola;Valore;Unità di Misura\n';
-    
+
     Object.keys(regoleCalcolo).sort().forEach(nomeRegola => {
         const dati = regoleCalcolo[nomeRegola];
         if (dati) {
@@ -2858,32 +3251,41 @@ function validatePassword(password) {
 async function changePassword() {
     const newPassword = document.getElementById('newPassword').value;
     const confirmPassword = document.getElementById('confirmPassword').value;
-    
+
     // Verifica che le password corrispondono
     if (newPassword !== confirmPassword) {
         showNotification('Le password non corrispondono!', 'error');
         return;
     }
-    
+
     // Valida la password
     const validation = validatePassword(newPassword);
     if (!validation.valid) {
         showNotification(validation.message, 'error');
         return;
     }
-    
-    // Hash the new password
-    const hashedPassword = await hashPassword(newPassword);
-    
-    // Aggiorna la password
-    currentUser.password = hashedPassword;
-    currentUser.mustChangePassword = false;
-    users[currentUser.email] = currentUser;
-    localStorage.setItem('loggedInUser', JSON.stringify(currentUser));
-    
-    closeRateModal();
-    showSection('calculator');
-    showNotification('Password cambiata con successo!', 'success');
+
+    try {
+        // Update password in Firebase Auth
+        const user = auth.currentUser;
+        await user.updatePassword(newPassword);
+
+        // Update mustChangePassword in Firestore
+        await db.collection('users').doc(currentUser.email).update({
+            mustChangePassword: false
+        });
+
+        // Update local state
+        currentUser.mustChangePassword = false;
+        localStorage.setItem('loggedInUser', JSON.stringify(currentUser));
+
+        closeRateModal();
+        showSection('calculator');
+        showNotification('Password cambiata con successo!', 'success');
+    } catch (error) {
+        console.error('Password change error:', error);
+        showNotification('Errore nel cambio password: ' + error.message, 'error');
+    }
 }
 
 // Saved Calculations Functions
